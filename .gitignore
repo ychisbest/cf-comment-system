@@ -6,3 +6,4 @@ public/widget.js
 public/admin/
 *.log
 .DS_Store
+mock-resend.log

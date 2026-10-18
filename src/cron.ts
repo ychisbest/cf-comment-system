@@ -1,8 +1,10 @@
 import type { Env } from './types';
 import { now } from './lib/db';
+import { processQueue } from './lib/email';
 
 /** 清理：24 小时未被引用的上传、过期的限流计数。 */
 export async function cleanup(env: Env): Promise<{ uploads: number; rate: number }> {
+  await processQueue(env).catch((e) => console.error('email queue', e));
   const cutoff = now() - 24 * 3600;
   const orphans = (await env.DB.prepare('SELECT key FROM uploads WHERE comment_id IS NULL AND created_at < ? LIMIT 200').bind(cutoff).all<{ key: string }>()).results;
   if (orphans.length) {

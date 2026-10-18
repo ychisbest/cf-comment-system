@@ -8,6 +8,7 @@ import { now, recountPages } from '../lib/db';
 import { checkRateLimit, d1Store, parseRules } from '../lib/ratelimit';
 import { verifyTurnstile } from '../lib/turnstile';
 import { clientIp } from '../lib/site';
+import { subscribe, notifyReply, unsubscribe } from '../lib/email';
 import { detectImageType, makeImageKey, IMAGE_KEY_RE, EXT_MIME, MAX_UPLOAD_BYTES } from '../lib/image';
 
 export const publicRoutes = new Hono<AppEnv>();
@@ -249,6 +250,20 @@ publicRoutes.post('/api/comments', async (c) => {
   await recountPages(env.DB, [pageId]);
   if (imageKey) await env.DB.prepare('UPDATE uploads SET comment_id = ? WHERE key = ?').bind(ins!.id, imageKey).run();
 
+  // 邮件通知：订阅本条评论的回复；若是回复则通知被回复者。均放入 waitUntil，失败不影响发表
+  const wantNotify = body.notify === true && !!email;
+  const newId = ins!.id;
+  c.executionCtx.waitUntil(
+    (async () => {
+      try {
+        if (wantNotify) await subscribe(env.DB, newId, email);
+        if (parentId != null && flagged !== 1) await notifyReply(env, parentId, { id: newId, page_id: pageId, email: email || null });
+      } catch (e) {
+        console.error('post-comment tasks failed', e);
+      }
+    })(),
+  );
+
   return json(c, { comment: toPublic(ins!), flagged: flagged === 1 }, 201, origin);
 });
 
@@ -348,4 +363,15 @@ publicRoutes.get('/img/*', async (c) => {
       ETag: obj.httpEtag,
     },
   });
+});
+
+// ---------- 退订 ----------
+
+publicRoutes.get('/api/unsubscribe', async (c) => {
+  const ok = await unsubscribe(c.env.DB, c.req.query('token') ?? '');
+  const msg = ok ? 'You have been unsubscribed. 已退订。' : 'Invalid or expired link. 链接无效或已失效。';
+  return new Response(
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Unsubscribe</title></head><body style="font-family:system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 16px"><p>${msg}</p></body></html>`,
+    { status: ok ? 200 : 404, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'", 'Referrer-Policy': 'no-referrer' } },
+  );
 });

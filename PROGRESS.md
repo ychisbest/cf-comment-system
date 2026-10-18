@@ -6,7 +6,7 @@
 | 2 互动与外观 | ✅ | 嵌套回复、投票（votes 表重算计数）、排序/分页、深浅色、Shadow DOM、CSS 变量/part/custom_css/data-css-url |
 | 3 图片与防滥用 | ✅ | R2 上传、魔数校验、Turnstile、D1 固定窗口限流、封禁检查、重复内容、cron 清理 |
 | 4 后台与管理 API | ✅ | 站点 CRUD、评论审核/批量、封禁、统计、响应式后台页（CSP 严格） |
-| 5 邮件通知 | ⏳ | |
+| 5 邮件通知 | ✅ | 订阅、Resend 发送（waitUntil）、10 分钟限频合并、日额度排队、退订 |
 | 6 SEO 收录 | ⏳ | |
 
 ## 阶段 1 验证
@@ -30,3 +30,11 @@
 - 隐藏评论后 `/api/comments` 立即不再返回且 total 减少；批量 spam/restore；封禁后同 IP 发表 403，`hide_existing` 隐藏其现有评论
 - 浏览器实测后台：登录后令牌仅在 sessionStorage（localStorage 为空）；站点页 CSS 预览渲染；站点 `custom_css` 经 `/api/comments` 的 config 注入 widget 生效
 - 后台页 CSP：`script-src 'self'`，无内联脚本
+
+## 阶段 5 验证（本地用 scripts/mock-resend.mjs 充当 Resend）
+- 回复后被回复者收到 1 封邮件（Authorization 头、List-Unsubscribe 头、摘要与 `#cm-<id>` 链接齐全）；自己回复自己不通知
+- 10 分钟内的后续回复进入 email_queue；节流未过时 cron 不发；过期后合并为 1 封"2 条新回复"
+- 邮件服务返回 500 时评论照常发表并排队，恢复后 cron 补发
+- 退订链接：无效 token 404；有效 token 删除该邮箱订阅与队列，之后回复不再发信
+- 待核查（flagged）的回复不触发通知，发送前再次检查回复仍为 visible
+- 邮件内容全部 HTML 转义、主题去换行（单测）

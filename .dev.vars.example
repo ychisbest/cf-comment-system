@@ -3,3 +3,4 @@ ADMIN_TOKEN=dev-admin-token-change-me
 TURNSTILE_SECRET=1x0000000000000000000000000000000AA
 RESEND_API_KEY=re_dummy_local_key
 IP_SALT=dev-local-salt-not-secret
+RESEND_API_URL=http://localhost:9911/emails   # 仅本地测试：指向 scripts/mock-resend.mjs
