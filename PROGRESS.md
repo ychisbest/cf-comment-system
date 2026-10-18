@@ -5,7 +5,7 @@
 | 1 最小可用 | ✅ | 建表、站点/页面、发表与读取、CORS、URL 规范化、widget 基础渲染 |
 | 2 互动与外观 | ✅ | 嵌套回复、投票（votes 表重算计数）、排序/分页、深浅色、Shadow DOM、CSS 变量/part/custom_css/data-css-url |
 | 3 图片与防滥用 | ✅ | R2 上传、魔数校验、Turnstile、D1 固定窗口限流、封禁检查、重复内容、cron 清理 |
-| 4 后台与管理 API | ⏳ | |
+| 4 后台与管理 API | ✅ | 站点 CRUD、评论审核/批量、封禁、统计、响应式后台页（CSP 严格） |
 | 5 邮件通知 | ⏳ | |
 | 6 SEO 收录 | ⏳ | |
 
@@ -24,3 +24,9 @@
 - 本地 smoke：SVG、伪装成 .png 的 SVG 被 415 拒绝；真 PNG 改名 .svg 按魔数存为 png；>2MB 返回 413；无 Origin 403；无 Turnstile token 403；超限 429（带 Retry-After）；图片响应 nosniff + immutable 缓存；key 只能被引用一次；相同内容 409
 - cron：把未引用上传回拨 25h 后触发 `/__scheduled`，R2 对象和记录被清理
 - Turnstile 本地用官方测试 secret（`1x…AA`）真实调用 siteverify
+
+## 阶段 4 验证
+- 管理 API：无/错误 token → 401；连续 10 次失败 → 429 锁定（含正确 token）；站点创建返回嵌入代码，非法域名 400
+- 隐藏评论后 `/api/comments` 立即不再返回且 total 减少；批量 spam/restore；封禁后同 IP 发表 403，`hide_existing` 隐藏其现有评论
+- 浏览器实测后台：登录后令牌仅在 sessionStorage（localStorage 为空）；站点页 CSS 预览渲染；站点 `custom_css` 经 `/api/comments` 的 config 注入 widget 生效
+- 后台页 CSP：`script-src 'self'`，无内联脚本
