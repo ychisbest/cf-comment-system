@@ -11,7 +11,7 @@ run_worker_first = true
 [[d1_databases]]
 binding = "DB"
 database_name = "comments"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"   # wrangler d1 create comments 后填入
+database_id = "70a7b928-1e6a-4506-8110-4b64b466d1f5"   # wrangler d1 create comments 后填入
 migrations_dir = "migrations"
 
 [[r2_buckets]]
@@ -24,11 +24,11 @@ crons = ["*/10 * * * *"]
 
 [vars]
 # Turnstile 站点密钥（公开）。下面是官方"总是通过"的测试 key，上线前换成真实的。
-TURNSTILE_SITEKEY = "1x00000000000000000000AA"
+TURNSTILE_SITEKEY = "0x4AAAAAAFZv_FW9qMIhMTZd"
 # Resend 发信地址（需已验证域名）
 EMAIL_FROM = "Comments <noreply@example.com>"
 # Worker 对外地址，用于邮件中的退订链接
-PUBLIC_BASE_URL = "https://comments.example.com"
+PUBLIC_BASE_URL = "https://cf-comment-system.ych8398527.workers.dev"
 # 限流：每个 ip_hash 的 "每分钟/每小时/每天" 上限
 RATE_COMMENT = "3/20/100"
 RATE_UPLOAD = "3/20/50"
