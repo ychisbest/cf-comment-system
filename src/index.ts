@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { AppEnv } from './types';
 import { publicRoutes } from './routes/public';
+import { ssrRoutes } from './routes/ssr';
 import { adminRoutes } from './routes/admin';
 import { cleanup } from './cron';
 
@@ -8,6 +9,7 @@ const app = new Hono<AppEnv>();
 
 app.route('/', publicRoutes);
 app.route('/', adminRoutes);
+app.route('/', ssrRoutes);
 
 // widget.js：强缓存（版本更新靠 URL 参数 / 短期 max-age + SWR）
 app.get('/widget.js', async (c) => {

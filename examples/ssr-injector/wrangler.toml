@@ -1,0 +1,10 @@
+name = "comments-ssr-injector"
+main = "index.ts"
+compatibility_date = "2025-09-01"
+
+# 生产：绑定到站点路由（站点域名需在同一 Cloudflare 账号）
+# routes = [{ pattern = "example.com/*", zone_name = "example.com" }]
+
+[vars]
+COMMENTS_ORIGIN = "https://comments.example.com"
+SITE_ID = "site_abc"

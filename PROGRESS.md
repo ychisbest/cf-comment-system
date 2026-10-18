@@ -7,7 +7,7 @@
 | 3 图片与防滥用 | ✅ | R2 上传、魔数校验、Turnstile、D1 固定窗口限流、封禁检查、重复内容、cron 清理 |
 | 4 后台与管理 API | ✅ | 站点 CRUD、评论审核/批量、封禁、统计、响应式后台页（CSP 严格） |
 | 5 邮件通知 | ✅ | 订阅、Resend 发送（waitUntil）、10 分钟限频合并、日额度排队、退订 |
-| 6 SEO 收录 | ⏳ | |
+| 6 SEO 收录 | ✅ | `/ssr`（html/json）、JSON-LD、延迟收录、外链/黑名单过滤、HTMLRewriter 注入示例 |
 
 ## 阶段 1 验证
 - `npm test`：URL 规范化 / 净化 / 来源校验单测通过
@@ -38,3 +38,19 @@
 - 退订链接：无效 token 404；有效 token 删除该邮箱订阅与队列，之后回复不再发信
 - 待核查（flagged）的回复不触发通知，发送前再次检查回复仍为 visible
 - 邮件内容全部 HTML 转义、主题去换行（单测）
+
+## 阶段 6 验证
+- `/ssr`：24h 内的新评论不出现；外链数 > 1 的评论不出现，后台"通过核查"（flagged=2）后立即出现；旧评论与其回复嵌套输出；内容转义，链接带 `rel="nofollow ugc noopener"`；JSON-LD 转义 `<>&`（单测）；`Cache-Control: public, max-age=60, stale-while-revalidate=300`
+- `examples/ssr-injector` 在本地 `wrangler dev` 下转发到示例页：`curl` 原始 HTML（不执行 JS）里 `<div id="comments">` 内已有评论与 `application/ld+json`
+- 浏览器实测：widget 接管后 Shadow DOM 正常渲染，注入的 light DOM 内容保留（3 条）且不重复显示
+
+## 最终总结
+全部 6 个阶段已通过本地验证（`npm test`：34 个单测全部通过；`npm run typecheck` 通过；`wrangler dev --local` 对 D1/R2 的 smoke 测试，浏览器实测 widget 与后台）。
+
+交付物（SPEC 第 14 节）：源码 + `wrangler.toml`（占位符）、`migrations/0001-0003`、`README.md`、单元测试（URL、净化、限流、魔数、Turnstile、邮件、SSR）、嵌入示例页 `examples/index.html`。
+
+未做 / 需要你注意：
+- **未部署、未创建任何远程资源、未使用真实密钥**。`wrangler.toml` 中 `database_id`、`PUBLIC_BASE_URL`、`EMAIL_FROM`、`TURNSTILE_SITEKEY`（目前是官方测试 key）上线前必须替换，并用 `wrangler secret put` 设置 4 个 secret。
+- Resend 实发、真实 Turnstile 挑战、真实 R2/D1 远程行为仅在本地模拟下验证（邮件用 `scripts/mock-resend.mjs`）。
+- 与 SPEC 的小偏差/决定：①头像用本地生成的首字母色块，不使用 Gravatar（避免泄露邮箱哈希）；②退订会删除该邮箱的全部订阅；③`email_hash` 为加盐哈希；④待核查评论不触发回复通知；⑤widget 前端逻辑在阶段 1 一次性写成，各后端接口在对应阶段补齐验证；⑥管理后台登录失败按 IP 锁定 10 分钟（共用同一出口 IP 时会互相影响）。
+- 评论列表接口 `private, max-age=5`：后台隐藏后最多约 5 秒内浏览器缓存仍可能显示（widget 自身请求用 `no-cache`，刷新即生效）。

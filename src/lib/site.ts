@@ -122,3 +122,9 @@ export async function voterHashOf(env: Env, req: Request, siteId: string): Promi
   const ua = req.headers.get('User-Agent') ?? '';
   return sha256Hex(`voter:${env.IP_SALT}:${clientIp(req)}:${ua}:${siteId}`);
 }
+
+/** Worker 对外地址：优先 PUBLIC_BASE_URL（占位符 example.com 视为未配置），否则用请求来源。 */
+export function publicBase(env: Env, req: Request): string {
+  const b = env.PUBLIC_BASE_URL && !env.PUBLIC_BASE_URL.includes('example.com') ? env.PUBLIC_BASE_URL : new URL(req.url).origin;
+  return b.replace(/\/$/, '');
+}

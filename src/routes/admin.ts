@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import type { AppEnv, Env } from '../types';
 import { timingSafeEqual, randomToken } from '../lib/hash';
-import { ipHashOf, rowToSite, coerceSettings, normalizeDomainEntry, DEFAULT_SETTINGS } from '../lib/site';
+import { ipHashOf, publicBase, rowToSite, coerceSettings, normalizeDomainEntry, DEFAULT_SETTINGS } from '../lib/site';
 import { now, recountPages } from '../lib/db';
 
 export const adminRoutes = new Hono<AppEnv>();
@@ -62,7 +62,7 @@ function siteJson(r: any, base: string) {
   };
 }
 
-const baseUrl = (c: Ctx) => (c.env.PUBLIC_BASE_URL && !c.env.PUBLIC_BASE_URL.includes('example.com') ? c.env.PUBLIC_BASE_URL : new URL(c.req.url).origin).replace(/\/$/, '');
+const baseUrl = (c: Ctx) => publicBase(c.env, c.req.raw);
 
 adminRoutes.get('/admin/api/sites', async (c) => {
   const rows = (await c.env.DB.prepare('SELECT * FROM sites ORDER BY created_at DESC').all()).results;
