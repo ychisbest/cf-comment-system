@@ -5,6 +5,10 @@ import { pageKeyFor } from '../lib/url';
 import { sanitizeText, sanitizeNickname, sanitizeLine, sanitizeEmail, countLinks, containsBlacklisted } from '../lib/sanitize';
 import { sha256Hex } from '../lib/hash';
 import { now, recountPages } from '../lib/db';
+import { checkRateLimit, d1Store, parseRules } from '../lib/ratelimit';
+import { verifyTurnstile } from '../lib/turnstile';
+import { clientIp } from '../lib/site';
+import { detectImageType, makeImageKey, IMAGE_KEY_RE, EXT_MIME, MAX_UPLOAD_BYTES } from '../lib/image';
 
 export const publicRoutes = new Hono<AppEnv>();
 
@@ -42,6 +46,17 @@ export async function guard(c: Ctx, siteId: unknown): Promise<{ site: Site; orig
   const origin = c.req.header('Origin') ?? null;
   if (!originAllowed(origin, site.domains)) return fail(c, 403, 'origin_not_allowed');
   return { site, origin: origin! };
+}
+
+/** 封禁 + 限流；通过返回 null，否则返回响应。 */
+async function abuseGate(c: Ctx, site: Site, ipHash: string, scope: 'comment' | 'upload' | 'vote'): Promise<Response | null> {
+  const ban = await c.env.DB.prepare('SELECT 1 FROM bans WHERE ip_hash = ? AND (site_id IS NULL OR site_id = ?) LIMIT 1').bind(ipHash, site.id).first();
+  if (ban) return fail(c, 403, 'banned');
+  const spec = { comment: c.env.RATE_COMMENT, upload: c.env.RATE_UPLOAD, vote: c.env.RATE_VOTE }[scope];
+  const dflt = { comment: '3/20/100', upload: '3/20/50', vote: '20/200/1000' }[scope];
+  const r = await checkRateLimit(d1Store(c.env.DB), scope, ipHash, parseRules(spec, dflt), now());
+  if (!r.ok) return fail(c, 429, 'rate_limited', { 'Retry-After': String(r.retryAfter) });
+  return null;
 }
 
 // ---------- 公共评论结构 ----------
@@ -170,6 +185,8 @@ publicRoutes.post('/api/comments', async (c) => {
   const st = site.settings;
 
   const ipHash = await ipHashOf(env, c.req.raw);
+  const gate = await abuseGate(c, site, ipHash, 'comment');
+  if (gate) return gate;
 
   const nickname = sanitizeNickname(body.nickname);
   const content = sanitizeText(body.content, st.maxLength);
@@ -179,6 +196,24 @@ publicRoutes.post('/api/comments', async (c) => {
 
   const key = pageKeyFor(body.page_id, body.url, st);
   if (!key) return fail(c, 400, 'bad_url');
+
+  // 图片：必须是本站点、尚未被引用的已上传对象
+  let imageKey: string | null = null;
+  if (body.image_key != null && body.image_key !== '') {
+    if (!st.allowImages || typeof body.image_key !== 'string' || !IMAGE_KEY_RE.test(body.image_key)) return fail(c, 400, 'bad_image');
+    const up = await env.DB.prepare('SELECT key FROM uploads WHERE key = ? AND site_id = ? AND comment_id IS NULL').bind(body.image_key, site.id).first();
+    if (!up) return fail(c, 400, 'bad_image');
+    imageKey = body.image_key;
+  }
+
+  // 重复内容：同一 IP 或同一页面 10 分钟内相同内容
+  const dup = await env.DB.prepare(
+    `SELECT 1 FROM comments WHERE content = ?1 AND created_at > ?2 AND (ip_hash = ?3 OR site_id = ?4) LIMIT 1`,
+  ).bind(content, now() - 600, ipHash, site.id).first();
+  if (dup) return fail(c, 409, 'duplicate_content');
+
+  // Turnstile（服务端校验，校验放在所有廉价检查之后以免浪费 token）
+  if (!(await verifyTurnstile(env, body.token, clientIp(c.req.raw)))) return fail(c, 403, 'turnstile_failed');
 
   // 父评论
   let parentId: number | null = null;
@@ -208,10 +243,11 @@ publicRoutes.post('/api/comments', async (c) => {
   const emailHash = email ? (await sha256Hex(`email:${env.IP_SALT}:${email}`)) : await sha256Hex(`anon:${env.IP_SALT}:${nickname}`);
   const ts = now();
   const ins = await env.DB.prepare(
-    `INSERT INTO comments (page_id, site_id, parent_id, root_id, nickname, email, email_hash, content, status, ip_hash, created_at, flagged)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'visible', ?, ?, ?) RETURNING ${COLS}`,
-  ).bind(pageId, site.id, parentId, rootId, nickname, email || null, emailHash, content, ipHash, ts, flagged).first<CommentRow>();
+    `INSERT INTO comments (page_id, site_id, parent_id, root_id, nickname, email, email_hash, content, image_key, status, ip_hash, created_at, flagged)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'visible', ?, ?, ?) RETURNING ${COLS}`,
+  ).bind(pageId, site.id, parentId, rootId, nickname, email || null, emailHash, content, imageKey, ipHash, ts, flagged).first<CommentRow>();
   await recountPages(env.DB, [pageId]);
+  if (imageKey) await env.DB.prepare('UPDATE uploads SET comment_id = ? WHERE key = ?').bind(ins!.id, imageKey).run();
 
   return json(c, { comment: toPublic(ins!), flagged: flagged === 1 }, 201, origin);
 });
@@ -227,6 +263,8 @@ publicRoutes.post('/api/vote', async (c) => {
   const value = body.value === 1 ? 1 : body.value === -1 ? -1 : 0;
   const commentId = Math.floor(Number(body.comment_id));
   if (!value || !Number.isFinite(commentId)) return fail(c, 400, 'bad_request');
+  const gate = await abuseGate(c, site, await ipHashOf(c.env, c.req.raw), 'vote');
+  if (gate) return gate;
 
   const comment = await c.env.DB.prepare("SELECT id FROM comments WHERE id = ? AND site_id = ? AND status = 'visible'").bind(commentId, site.id).first();
   if (!comment) return fail(c, 404, 'not_found');
@@ -250,4 +288,64 @@ publicRoutes.post('/api/vote', async (c) => {
   await c.env.DB.batch(stmts);
   const row = await c.env.DB.prepare('SELECT likes, dislikes FROM comments WHERE id = ?').bind(commentId).first<{ likes: number; dislikes: number }>();
   return json(c, { likes: row!.likes, dislikes: row!.dislikes, my_vote: mine }, 200, origin);
+});
+
+// ---------- 图片上传 ----------
+
+publicRoutes.post('/api/upload', async (c) => {
+  const origin = c.req.header('Origin') ?? null;
+  // 先看 Content-Length，避免读取超大请求体（multipart 有少量开销）
+  const len = Number(c.req.header('Content-Length') ?? '0');
+  if (len > MAX_UPLOAD_BYTES + 64 * 1024) return fail(c, 413, 'too_large');
+  let fd: FormData;
+  try {
+    fd = await c.req.formData();
+  } catch {
+    return fail(c, 400, 'bad_form');
+  }
+  const g = await guard(c, fd.get('site'));
+  if (g instanceof Response) return g;
+  const { site } = g;
+  if (!site.settings.allowImages) return fail(c, 403, 'images_disabled');
+
+  const ipHash = await ipHashOf(c.env, c.req.raw);
+  const gate = await abuseGate(c, site, ipHash, 'upload');
+  if (gate) return gate;
+
+  const file = fd.get('file');
+  if (!file || typeof file === 'string') return fail(c, 400, 'file_required');
+  const f = file as unknown as File;
+  if (f.size > MAX_UPLOAD_BYTES) return fail(c, 413, 'too_large');
+  const bytes = new Uint8Array(await f.arrayBuffer());
+  if (bytes.length > MAX_UPLOAD_BYTES) return fail(c, 413, 'too_large');
+  const type = detectImageType(bytes); // 只看魔数，忽略 Content-Type / 文件名
+  if (!type) return fail(c, 415, 'unsupported_image');
+
+  if (!(await verifyTurnstile(c.env, fd.get('token'), clientIp(c.req.raw)))) return fail(c, 403, 'turnstile_failed');
+
+  const key = makeImageKey(site.id, type.ext);
+  await c.env.BUCKET.put(key, bytes, { httpMetadata: { contentType: type.mime } });
+  await c.env.DB.prepare('INSERT INTO uploads (key, site_id, ip_hash, mime, size, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(key, site.id, ipHash, type.mime, bytes.length, now()).run();
+  return json(c, { image_key: key }, 201, origin);
+});
+
+// ---------- 图片读取 ----------
+
+publicRoutes.get('/img/*', async (c) => {
+  const key = decodeURIComponent(c.req.path.slice('/img/'.length));
+  if (!IMAGE_KEY_RE.test(key)) return c.text('not found', 404);
+  const obj = await c.env.BUCKET.get(key);
+  if (!obj) return c.text('not found', 404);
+  // Content-Type 由扩展名（上传时按魔数确定）推出，而不是客户端提供的值
+  const mime = EXT_MIME[key.split('.').pop()!] ?? 'application/octet-stream';
+  return new Response(obj.body, {
+    headers: {
+      'Content-Type': mime,
+      'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      ETag: obj.httpEtag,
+    },
+  });
 });

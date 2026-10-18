@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { AppEnv } from './types';
 import { publicRoutes } from './routes/public';
+import { cleanup } from './cron';
 
 const app = new Hono<AppEnv>();
 
@@ -26,4 +27,7 @@ app.onError((err, c) => {
 
 export default {
   fetch: app.fetch,
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil(cleanup(env));
+  },
 } satisfies ExportedHandler<import('./types').Env>;
