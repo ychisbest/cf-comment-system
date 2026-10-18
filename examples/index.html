@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Comment widget demo</title>
+  <!-- 可选：canonical 优先作为页面标识 -->
+  <!-- <link rel="canonical" href="https://example.com/posts/hello"> -->
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
+    /* 方式 1：通过 ::part() 覆盖样式 */
+    #comments::part(submit) { border-radius: 999px; }
+    /* 方式 1：通过 CSS 变量覆盖 */
+    #comments { --cm-accent: #16a34a; --cm-radius: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Hello, comments</h1>
+  <p>用 <code>python3 -m http.server 3000 -d examples</code> 打开本页（localhost 在开发站点白名单内），Worker 运行在 8787。</p>
+
+  <div id="comments"></div>
+  <!-- 嵌入代码：把 src 换成你部署的 Worker 域名，data-site 换成后台生成的站点 ID -->
+  <script src="http://localhost:8787/widget.js"
+          data-site="site_dev"
+          data-lang="auto"
+          defer></script>
+  <!-- 其他可选属性：
+       data-page-id="post-42"        用固定 ID 代替 URL 匹配
+       data-theme="dark|light"       强制主题（默认跟随系统）
+       data-css-url="/my-comments.css"  外部样式表（方式 3）
+  -->
+</body>
+</html>
