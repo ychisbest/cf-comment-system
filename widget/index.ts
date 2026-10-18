@@ -53,7 +53,7 @@ function mount(host: HTMLElement, o: Opts) {
   root.appendChild(wrap);
 
   const mq = matchMedia('(prefers-color-scheme: dark)');
-  const applyTheme = () => { wrap.dataset.theme = o.theme === 'dark' || o.theme === 'light' ? o.theme : mq.matches ? 'dark' : 'light'; };
+  const applyTheme = () => { const th = o.theme === 'dark' || o.theme === 'light' ? o.theme : mq.matches ? 'dark' : 'light'; wrap.dataset.theme = th; host.dataset.theme = th; };
   applyTheme();
   mq.addEventListener?.('change', applyTheme);
 

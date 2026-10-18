@@ -215,3 +215,39 @@ publicRoutes.post('/api/comments', async (c) => {
 
   return json(c, { comment: toPublic(ins!), flagged: flagged === 1 }, 201, origin);
 });
+
+// ---------- 点赞 / 点踩 ----------
+
+publicRoutes.post('/api/vote', async (c) => {
+  const body = await readJson(c);
+  if (!body) return fail(c, 400, 'bad_json');
+  const g = await guard(c, body.site);
+  if (g instanceof Response) return g;
+  const { site, origin } = g;
+  const value = body.value === 1 ? 1 : body.value === -1 ? -1 : 0;
+  const commentId = Math.floor(Number(body.comment_id));
+  if (!value || !Number.isFinite(commentId)) return fail(c, 400, 'bad_request');
+
+  const comment = await c.env.DB.prepare("SELECT id FROM comments WHERE id = ? AND site_id = ? AND status = 'visible'").bind(commentId, site.id).first();
+  if (!comment) return fail(c, 404, 'not_found');
+
+  const voter = await voterHashOf(c.env, c.req.raw, site.id);
+  const cur = await c.env.DB.prepare('SELECT value FROM votes WHERE comment_id = ? AND voter_hash = ?').bind(commentId, voter).first<{ value: number }>();
+  let mine: number = value;
+  const stmts: D1PreparedStatement[] = [];
+  if (!cur) stmts.push(c.env.DB.prepare('INSERT OR IGNORE INTO votes (comment_id, voter_hash, value) VALUES (?, ?, ?)').bind(commentId, voter, value));
+  else if (cur.value === value) { // 再次点击同值：取消
+    mine = 0;
+    stmts.push(c.env.DB.prepare('DELETE FROM votes WHERE comment_id = ? AND voter_hash = ?').bind(commentId, voter));
+  } else stmts.push(c.env.DB.prepare('UPDATE votes SET value = ? WHERE comment_id = ? AND voter_hash = ?').bind(value, commentId, voter));
+  // 计数始终由 votes 表重新统计，保证"每个 voter 一票"且并发下也准确
+  stmts.push(
+    c.env.DB.prepare(
+      `UPDATE comments SET likes = (SELECT COUNT(*) FROM votes WHERE comment_id = ?1 AND value = 1),
+                           dislikes = (SELECT COUNT(*) FROM votes WHERE comment_id = ?1 AND value = -1) WHERE id = ?1`,
+    ).bind(commentId),
+  );
+  await c.env.DB.batch(stmts);
+  const row = await c.env.DB.prepare('SELECT likes, dislikes FROM comments WHERE id = ?').bind(commentId).first<{ likes: number; dislikes: number }>();
+  return json(c, { likes: row!.likes, dislikes: row!.dislikes, my_vote: mine }, 200, origin);
+});

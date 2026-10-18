@@ -1,13 +1,13 @@
-:host { all: initial; display: block; }
-.cm {
+:host { all: initial; display: block;
   --cm-bg: #ffffff; --cm-text: #1f2328; --cm-muted: #6b7280; --cm-border: #e5e7eb;
   --cm-accent: #2563eb; --cm-accent-text: #ffffff; --cm-input-bg: #ffffff; --cm-danger: #dc2626;
-  --cm-radius: 8px; --cm-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; --cm-gap: 12px;
+  --cm-radius: 8px; --cm-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; --cm-gap: 12px; }
+.cm {
   font-family: var(--cm-font); color: var(--cm-text); background: var(--cm-bg);
   font-size: 15px; line-height: 1.55; box-sizing: border-box;
 }
 .cm *, .cm *::before, .cm *::after { box-sizing: inherit; }
-.cm[data-theme="dark"] {
+:host([data-theme="dark"]) {
   --cm-bg: #14171c; --cm-text: #e6e8eb; --cm-muted: #9aa3af; --cm-border: #2d333b;
   --cm-accent: #6ea8ff; --cm-accent-text: #0b1220; --cm-input-bg: #1b1f26; --cm-danger: #f87171;
 }
