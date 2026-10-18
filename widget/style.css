@@ -1,3 +1,4 @@
+[hidden] { display: none !important; }
 :host { all: initial; display: block;
   --cm-bg: #ffffff; --cm-text: #1f2328; --cm-muted: #6b7280; --cm-border: #e5e7eb;
   --cm-accent: #2563eb; --cm-accent-text: #ffffff; --cm-input-bg: #ffffff; --cm-danger: #dc2626;

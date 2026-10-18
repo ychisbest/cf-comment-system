@@ -149,7 +149,7 @@ function mount(host: HTMLElement, o: Opts) {
   }
   header.append(title, sortBox);
   wrap.append(header, formSlot, listEl, status, moreBtn);
-  moreBtn.onclick = () => void load(false);
+  moreBtn.onclick = () => { if (cursor != null) void load(false); };
 
   function timeLabel(ts: number): string {
     const diff = ts - Math.floor(Date.now() / 1000);
