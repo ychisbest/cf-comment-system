@@ -131,7 +131,7 @@ function mount(host: HTMLElement, o: Opts) {
   sortBox.setAttribute('role', 'group');
   const listEl = h('ul', 'cm-list', 'list');
   const moreBtn = h('button', 'cm-btn cm-more', 'more-button');
-  moreBtn.type = 'button';
+  moreBtn.type = 'button'; moreBtn.hidden = true;
   const status = h('div', 'cm-loading', 'status');
   status.setAttribute('role', 'status');
   const formSlot = h('div');
