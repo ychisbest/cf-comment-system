@@ -189,7 +189,7 @@ async function viewComments() {
 // ---------- 站点 ----------
 const SETTING_FIELDS: [string, string, 'number' | 'bool' | 'text' | 'lines'][] = [
   ['pageSize', '每页条数', 'number'], ['maxDepth', '嵌套缩进层数', 'number'], ['maxLength', '评论最大长度', 'number'], ['allowImages', '允许图片', 'bool'],
-  ['lang', '语言 (auto/en/zh)', 'text'], ['ssrEnabled', '启用 SEO 片段 (SSR)', 'bool'], ['ssrDelayHours', 'SSR 延迟（小时）', 'number'], ['ssrMaxComments', 'SSR 最多条数', 'number'],
+  ['lang', '语言 (auto/en/zh/zh-TW/ja/ko/es/fr/de/pt/ru/it/vi/id/tr/pl/nl/th/uk/hi/ar/he)', 'text'], ['ssrEnabled', '启用 SEO 片段 (SSR)', 'bool'], ['ssrDelayHours', 'SSR 延迟（小时）', 'number'], ['ssrMaxComments', 'SSR 最多条数', 'number'],
   ['maxLinks', '外链阈值（超过则待核查）', 'number'], ['stripWww', '规范化时去掉 www', 'bool'], ['queryMode', '查询参数 (keep/drop)', 'text'], ['blacklist', '黑名单关键词（每行一个）', 'lines'],
 ];
 
@@ -247,7 +247,7 @@ function siteCard(s: any): HTMLElement {
   const details = h('details', null, h('summary', null, '编辑 / 自定义 CSS / 设置'),
     h('div', { class: 'two', style: 'margin-top:10px' },
       h('div', null, h('div', { class: 'field' }, h('label', null, '名称'), name), h('div', { class: 'field' }, h('label', null, '域名白名单（每行一个，支持 *.example.com）'), domains), ...fields),
-      h('div', null, h('div', { class: 'field' }, h('label', null, '自定义 CSS（变量：--cm-bg --cm-text --cm-accent --cm-radius …）'), css), h('div', { class: 'field' }, h('label', null, '预览'), previewBox))),
+      h('div', null, h('div', { class: 'field' }, h('label', null, '自定义 CSS（变量：--cm-text --cm-accent --cm-radius …）'), css), h('div', { class: 'field' }, h('label', null, '预览'), previewBox))),
     h('div', { class: 'row' }, save, del));
   details.addEventListener('toggle', () => { if ((details as HTMLDetailsElement).open) renderPreview(); });
   return h('div', { class: 'card' }, h('h2', null, s.name), h('div', { class: 'muted' }, `ID: ${s.id} · 域名: ${s.domains.join(', ')}`), h('div', { class: 'field', style: 'margin-top:8px' }, h('label', null, '嵌入代码'), embed,

@@ -57,7 +57,7 @@ npm test && npm run typecheck
    <div id="comments"></div>
    <script src="https://comments.example.com/widget.js" data-site="site_xxxx" defer></script>
    ```
-   可选属性：`data-page-id`（用固定 ID 代替 URL 匹配）、`data-lang`（auto/en/zh）、`data-theme`（light/dark）、`data-css-url`（外部样式表）、`data-target`（容器选择器）。
+   可选属性：`data-page-id`（用固定 ID 代替 URL 匹配）、`data-lang`（auto 或 en/zh/zh-TW/ja/ko/es/fr/de/pt/ru/it/vi/id/tr/pl/nl/th/uk/hi/ar/he）、`data-theme`（light/dark）、`data-css-url`（外部样式表）、`data-target`（容器选择器）。
 
 ## 页面匹配
 
@@ -65,7 +65,7 @@ npm test && npm run typecheck
 
 ## 自定义外观
 
-1. CSS 变量与 `::part()`：`#comments { --cm-accent: #16a34a; --cm-radius: 12px }`、`#comments::part(submit) { … }`。变量：`--cm-bg --cm-text --cm-muted --cm-border --cm-accent --cm-accent-text --cm-input-bg --cm-danger --cm-radius --cm-font --cm-gap`。part：`container header title sort sort-button form textarea input submit list item comment avatar meta name time text image tools vote-up vote-down reply-button replies more-button …`
+1. CSS 变量与 `::part()`：`#comments { --cm-accent: #16a34a; --cm-radius: 12px }`、`#comments::part(submit) { … }`。变量：`--cm-text --cm-muted --cm-border --cm-hover --cm-accent --cm-accent-text --cm-danger --cm-radius --cm-font --cm-gap`。part：`container header title sort sort-button form textarea input submit list item comment avatar meta name time text image tools vote-up vote-down reply-button replies more-button …`
 2. 后台站点配置的 `custom_css`（带预览），由 widget 注入 Shadow DOM。
 3. `data-css-url` 外部样式表。
 

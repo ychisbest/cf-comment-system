@@ -57,14 +57,16 @@ function mount(host: HTMLElement, o: Opts) {
   applyTheme();
   mq.addEventListener?.('change', applyTheme);
 
-  let { dict: t, locale } = dictFor(o.lang);
+  let { dict: t, locale, dir } = dictFor(o.lang);
+  wrap.dir = dir;
   let cfg: Config | null = null;
   let comments: C[] = [];
   let total = 0;
   let cursor: number | null = null;
   let sort: 'new' | 'hot' = 'new';
   const pageUrl = resolvePageUrl(document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href, location.href);
-  const rtf = (() => { try { return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }); } catch { return null; } })();
+  const mkRtf = () => { try { return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }); } catch { return null; } };
+  let rtf = mkRtf();
 
   // ---------- API ----------
   async function api(path: string, init?: RequestInit): Promise<any> {
@@ -384,7 +386,7 @@ function mount(host: HTMLElement, o: Opts) {
       const r = await api('/api/comments?' + qs);
       if (r.config && !cfg) {
         cfg = r.config as Config;
-        if (o.lang === 'auto' && cfg.settings.lang && cfg.settings.lang !== 'auto') ({ dict: t, locale } = dictFor(cfg.settings.lang));
+        if (o.lang === 'auto' && cfg.settings.lang && cfg.settings.lang !== 'auto') ({ dict: t, locale, dir } = dictFor(cfg.settings.lang)); wrap.dir = dir; rtf = mkRtf();
         customStyle.textContent = (cfg.custom_css || '') + (o.demoCss || '');
         formSlot.textContent = '';
         formSlot.appendChild(buildForm(null, addComment));
