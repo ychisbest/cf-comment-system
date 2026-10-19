@@ -34,6 +34,31 @@ const store = {
   set(k: string, v: string) { try { localStorage.setItem(k, v); } catch { /* 忽略 */ } },
 };
 
+// 判断宿主网站当前是深色还是浅色：显式标记 > color-scheme > 背景亮度 > 系统偏好
+function detectSiteTheme(systemDark: boolean): 'light' | 'dark' {
+  const els = [document.documentElement, document.body].filter(Boolean) as HTMLElement[];
+  for (const el of els) {
+    const attr = ['data-theme', 'data-bs-theme', 'data-color-mode', 'data-mode', 'color-scheme'].map((a) => el.getAttribute(a) || '').join(' ').toLowerCase();
+    if (/\bdark\b/.test(attr)) return 'dark';
+    if (/\blight\b/.test(attr)) return 'light';
+    const cls = ' ' + el.className + ' ';
+    if (/[\s-](dark|dark-mode|theme-dark)[\s]/i.test(cls)) return 'dark';
+    if (/[\s-](light|light-mode|theme-light)[\s]/i.test(cls)) return 'light';
+  }
+  for (const el of els) {
+    const cs = getComputedStyle(el);
+    const m = cs.backgroundColor.match(/rgba?\(([^)]+)\)/);
+    if (m) {
+      const [r, g, b, a = 1] = m[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+      if (a > 0.5) return 0.2126 * r + 0.7152 * g + 0.0722 * b < 128 ? 'dark' : 'light';
+    }
+  }
+  const cs = getComputedStyle(document.documentElement).colorScheme;
+  if (cs === 'dark') return 'dark';
+  if (cs === 'light') return 'light';
+  return systemDark ? 'dark' : 'light';
+}
+
 function mount(host: HTMLElement, o: Opts) {
   const root = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
   root.textContent = '';
@@ -53,9 +78,16 @@ function mount(host: HTMLElement, o: Opts) {
   root.appendChild(wrap);
 
   const mq = matchMedia('(prefers-color-scheme: dark)');
-  const applyTheme = () => { const th = o.theme === 'dark' || o.theme === 'light' ? o.theme : mq.matches ? 'dark' : 'light'; wrap.dataset.theme = th; host.dataset.theme = th; };
+  const applyTheme = () => { const th = o.theme === 'dark' || o.theme === 'light' ? o.theme : detectSiteTheme(mq.matches); wrap.dataset.theme = th; host.dataset.theme = th; };
   applyTheme();
   mq.addEventListener?.('change', applyTheme);
+  if (o.theme !== 'dark' && o.theme !== 'light') {
+    // 跟随网站自身的深浅切换（class / data-* 属性 / color-scheme 变化）
+    const mo = new MutationObserver(applyTheme);
+    const opts = { attributes: true, attributeFilter: ['class', 'data-theme', 'data-bs-theme', 'data-color-mode', 'data-mode', 'style', 'color-scheme'] };
+    mo.observe(document.documentElement, opts);
+    if (document.body) mo.observe(document.body, opts);
+  }
 
   let { dict: t, locale, dir } = dictFor(o.lang);
   wrap.dir = dir;
