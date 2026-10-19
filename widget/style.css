@@ -1,5 +1,5 @@
 [hidden] { display: none !important; }
-:host { all: initial; display: block;
+:host { all: initial; display: block; width: 100%; min-width: min(44rem, calc(100vw - 2rem)); max-width: 100%; box-sizing: border-box;
   --cm-text: #475569; --cm-strong: #0f172a; --cm-muted: #94a3b8; --cm-border: rgba(100,116,139,.22); --cm-hover: rgba(100,116,139,.12);
   --cm-tint: rgba(100,116,139,.07); --cm-surface: #ffffff; --cm-shadow: 0 1px 2px rgba(15,23,42,.08);
   --cm-accent: #4f46e5; --cm-accent-soft: rgba(79,70,229,.1); --cm-accent-text: #ffffff; --cm-danger: #e11d48;
@@ -14,7 +14,7 @@
   font-size: 14px; line-height: 1.65; box-sizing: border-box;
 }
 .cm *, .cm *::before, .cm *::after { box-sizing: inherit; }
-.cm button { font: inherit; color: inherit; cursor: pointer; transition: background-color .15s, color .15s, border-color .15s, opacity .15s, transform .1s; }
+:where(.cm) button { font: inherit; color: inherit; cursor: pointer; transition: background-color .15s, color .15s, border-color .15s, opacity .15s, transform .1s; }
 
 /* 头部 */
 .cm-header { display: flex; justify-content: space-between; align-items: center; gap: var(--cm-gap); flex-wrap: wrap; margin: 0 0 24px; padding-bottom: 16px; border-bottom: 1px solid var(--cm-border); }
