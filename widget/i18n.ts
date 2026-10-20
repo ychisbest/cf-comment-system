@@ -224,8 +224,11 @@ export const supportedLangs = Object.keys(dicts);
 
 const RTL = new Set(['ar', 'he']);
 
+// auto 模式：优先跟随页面 <html lang>（站点自己的语言切换），其次浏览器语言
+export const pageLang = () => document.documentElement.lang || navigator.language;
+
 export function dictFor(lang: string): { dict: Dict; locale: string; dir: 'ltr' | 'rtl' } {
-  const l = (lang === 'auto' || !lang ? navigator.language : lang).toLowerCase().replace('_', '-');
+  const l = (lang === 'auto' || !lang ? pageLang() : lang).toLowerCase().replace('_', '-');
   let key = l;
   if (/^zh-(tw|hk|mo|hant)/.test(l)) key = 'zh-tw';
   else if (!dicts[key]) key = l.split('-')[0];

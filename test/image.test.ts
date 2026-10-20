@@ -35,7 +35,7 @@ describe('image key', () => {
 
 describe('verifyTurnstile', () => {
   afterEach(() => vi.unstubAllGlobals());
-  const env: any = { TURNSTILE_SECRET: 's' };
+  const env: any = { TURNSTILE_SECRET: 's', TURNSTILE_SITEKEY: 'k' };
   it('success=true 才通过；缺 token、HTTP 错误、异常都失败', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ success: true }))));
     expect(await verifyTurnstile(env, 'tok', '1.1.1.1')).toBe(true);
@@ -47,5 +47,12 @@ describe('verifyTurnstile', () => {
     expect(await verifyTurnstile(env, 'tok', 'x')).toBe(false);
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('net'); }));
     expect(await verifyTurnstile(env, 'tok', 'x')).toBe(false);
+  });
+  it('未配置 secret 或 sitekey 时整体关闭（直接通过，不发请求）', async () => {
+    const f = vi.fn();
+    vi.stubGlobal('fetch', f);
+    expect(await verifyTurnstile({} as any, undefined, 'x')).toBe(true);
+    expect(await verifyTurnstile({ TURNSTILE_SECRET: 's' } as any, '', 'x')).toBe(true);
+    expect(f).not.toHaveBeenCalled();
   });
 });

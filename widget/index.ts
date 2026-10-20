@@ -1,5 +1,5 @@
 import CSS from './style.css';
-import { dictFor, type Dict } from './i18n';
+import { dictFor, pageLang, type Dict } from './i18n';
 import { resolvePageUrl } from '../src/lib/url';
 
 interface C {
@@ -90,6 +90,12 @@ function mount(host: HTMLElement, o: Opts) {
   }
 
   let { dict: t, locale, dir } = dictFor(o.lang);
+  if (o.lang === 'auto') {
+    // 站点切换 <html lang> 时重新挂载，文案随之切换
+    const cur = pageLang();
+    const lo = new MutationObserver(() => { if (pageLang() !== cur) { lo.disconnect(); mount(host, o); } });
+    lo.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
+  }
   wrap.dir = dir;
   let cfg: Config | null = null;
   let comments: C[] = [];
@@ -151,6 +157,7 @@ function mount(host: HTMLElement, o: Opts) {
   /** 取一个一次性 token，取走后立即 reset 以便后台生成下一个。 */
   async function takeToken(): Promise<string> {
     if (o.demo) return 'demo';
+    if (!cfg?.turnstile_sitekey) return '';
     await loadTurnstile();
     const tok = tsToken ?? (await new Promise<string>((res, rej) => { tsWaiters.push(res); setTimeout(() => rej(Object.assign(new Error('captcha_timeout'), { code: 'turnstile_failed' })), 30000); }));
     tsToken = null;
@@ -418,7 +425,7 @@ function mount(host: HTMLElement, o: Opts) {
       const r = await api('/api/comments?' + qs);
       if (r.config && !cfg) {
         cfg = r.config as Config;
-        if (o.lang === 'auto' && cfg.settings.lang && cfg.settings.lang !== 'auto') ({ dict: t, locale, dir } = dictFor(cfg.settings.lang)); wrap.dir = dir; rtf = mkRtf();
+        if (o.lang === 'auto' && !document.documentElement.lang && cfg.settings.lang && cfg.settings.lang !== 'auto') ({ dict: t, locale, dir } = dictFor(cfg.settings.lang)); wrap.dir = dir; rtf = mkRtf();
         customStyle.textContent = (cfg.custom_css || '') + (o.demoCss || '');
         formSlot.textContent = '';
         formSlot.appendChild(buildForm(null, addComment));

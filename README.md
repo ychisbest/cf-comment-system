@@ -1,6 +1,6 @@
 # cf-comment-system
 
-纯 Cloudflare 无服务器多站点评论系统：Workers + Hono + D1 + R2 + Turnstile + Resend。一套后端供多个站点共用，站点只需嵌入一段 script。
+纯 Cloudflare 无服务器多站点评论系统：Workers + Hono + D1 + R2 + Resend（Turnstile 可选）。一套后端供多个站点共用，站点只需嵌入一段 script。
 
 特性：匿名评论（昵称 + 可选邮箱）、先发后审、嵌套回复、点赞/点踩、图片（前端压缩为 WebP）、Shadow DOM + 三种自定义 CSS 方式、浅色/深色、回复邮件通知、管理后台 + 管理 API、SEO 服务端片段（JSON-LD）。
 
@@ -98,7 +98,7 @@ Agent 自动审核示例：`GET /admin/api/comments?pending=1` 取待核查 → 
 
 ## 安全要点
 
-存储时剥除所有 HTML、前端只用 `textContent`；Origin 必须在站点白名单；发表与上传必须通过服务端 Turnstile 校验；按 `ip_hash` 分钟/小时/天限流（429 + `Retry-After`）；图片仅 JPEG/PNG/WebP/GIF，按魔数识别、≤ 2MB、随机 key、`nosniff`，24 小时未引用自动清理；IP 仅存盐值哈希，邮箱不对外返回；管理 token 常量时间比较 + 失败锁定；全部 SQL 为预编译绑定；每评论每 voter 只计一票。
+存储时剥除所有 HTML、前端只用 `textContent`；Origin 必须在站点白名单；Turnstile 默认关闭（同时配置 `TURNSTILE_SITEKEY` 与 `TURNSTILE_SECRET` 才启用，启用后发表与上传需通过服务端校验）；同一 IP 30 秒内只能发一条评论；按 `ip_hash` 分钟/小时/天限流（429 + `Retry-After`）；图片仅 JPEG/PNG/WebP/GIF，按魔数识别、≤ 2MB、随机 key、`nosniff`，24 小时未引用自动清理；IP 仅存盐值哈希，邮箱不对外返回；管理 token 常量时间比较 + 失败锁定；全部 SQL 为预编译绑定；每评论每 voter 只计一票。
 
 ## 免费额度提示
 

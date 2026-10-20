@@ -4,11 +4,11 @@ export interface Env {
   ASSETS: Fetcher;
   // secrets
   ADMIN_TOKEN: string;
-  TURNSTILE_SECRET: string;
+  TURNSTILE_SECRET?: string; // 可选：不配置则关闭 Turnstile
   RESEND_API_KEY: string;
   IP_SALT: string;
   // vars
-  TURNSTILE_SITEKEY: string;
+  TURNSTILE_SITEKEY?: string;
   TURNSTILE_VERIFY_URL?: string; // 仅测试用：覆盖 siteverify 地址
   EMAIL_FROM: string;
   PUBLIC_BASE_URL: string;

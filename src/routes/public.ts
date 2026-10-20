@@ -6,7 +6,7 @@ import { sanitizeText, sanitizeNickname, sanitizeLine, sanitizeEmail, countLinks
 import { sha256Hex } from '../lib/hash';
 import { now, recountPages } from '../lib/db';
 import { checkRateLimit, d1Store, parseRules } from '../lib/ratelimit';
-import { verifyTurnstile } from '../lib/turnstile';
+import { verifyTurnstile, turnstileEnabled } from '../lib/turnstile';
 import { clientIp } from '../lib/site';
 import { subscribe, notifyReply, unsubscribe } from '../lib/email';
 import { detectImageType, makeImageKey, IMAGE_KEY_RE, EXT_MIME, MAX_UPLOAD_BYTES } from '../lib/image';
@@ -48,6 +48,8 @@ export async function guard(c: Ctx, siteId: unknown): Promise<{ site: Site; orig
   if (!originAllowed(origin, site.domains)) return fail(c, 403, 'origin_not_allowed');
   return { site, origin: origin! };
 }
+
+const COMMENT_COOLDOWN = 30; // 秒
 
 /** 封禁 + 限流；通过返回 null，否则返回响应。 */
 async function abuseGate(c: Ctx, site: Site, ipHash: string, scope: 'comment' | 'upload' | 'vote'): Promise<Response | null> {
@@ -111,7 +113,7 @@ publicRoutes.get('/api/comments', async (c) => {
   if (!key) return fail(c, 400, 'bad_url');
 
   const first = !q.cursor;
-  const cfg = first ? { settings: publicSettings(site), custom_css: site.custom_css, turnstile_sitekey: c.env.TURNSTILE_SITEKEY } : undefined;
+  const cfg = first ? { settings: publicSettings(site), custom_css: site.custom_css, turnstile_sitekey: turnstileEnabled(c.env) ? c.env.TURNSTILE_SITEKEY : '' } : undefined;
   const page = await c.env.DB.prepare('SELECT id, comment_count FROM pages WHERE site_id = ? AND page_key = ?').bind(site.id, key).first<{ id: number; comment_count: number }>();
   const hdr = { 'Cache-Control': 'private, max-age=5' };
   if (!page) return json(c, { comments: [], total: 0, next_cursor: null, config: cfg }, 200, origin, hdr);
@@ -188,6 +190,12 @@ publicRoutes.post('/api/comments', async (c) => {
   const ipHash = await ipHashOf(env, c.req.raw);
   const gate = await abuseGate(c, site, ipHash, 'comment');
   if (gate) return gate;
+
+  // 同一 IP 每 COMMENT_COOLDOWN 秒只能发一条（精确滑动窗口，查最近一条评论）
+  const last = await env.DB.prepare('SELECT created_at FROM comments WHERE ip_hash = ? ORDER BY created_at DESC LIMIT 1').bind(ipHash).first<{ created_at: number }>();
+  if (last && now() - last.created_at < COMMENT_COOLDOWN) {
+    return fail(c, 429, 'rate_limited', { 'Retry-After': String(COMMENT_COOLDOWN - (now() - last.created_at)) });
+  }
 
   const nickname = sanitizeNickname(body.nickname);
   const content = sanitizeText(body.content, st.maxLength);
